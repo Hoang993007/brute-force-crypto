@@ -1,0 +1,1 @@
+pkg ./dist/src/main.js
