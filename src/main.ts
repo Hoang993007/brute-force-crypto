@@ -31,6 +31,7 @@ async function bootstrap() {
   const etherService = module.get(EtherService);
 
   let count = 0;
+  const start = Date.now();
 
   if (!etherService.network) {
     await etherService.refreshRpc();
@@ -94,6 +95,8 @@ async function bootstrap() {
     }
     count++;
     console.log('=== Processed: ', count);
+    const diff = Date.now() - start;
+    console.log('=== Speed: ', (count / (diff / 1000)).toFixed(1), 'wallet/s');
     console.log('\n');
   }
 }

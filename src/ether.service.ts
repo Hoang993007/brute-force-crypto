@@ -70,6 +70,10 @@ const fetchChain = async (baseURL) => {
 };
 
 const assessChain = (chain: any) => {
+  chain = chain.filter(
+    (el) =>
+      el.data && el.data.height && el.data.latency && el.data.latency < 400,
+  );
   const sortedData = chain?.sort((a, b) => {
     const h1 = a?.data?.height;
     const h2 = b?.data?.height;
@@ -95,44 +99,43 @@ const assessChain = (chain: any) => {
     }
   });
 
-  const topRpc = sortedData[0]?.data ?? {};
+  const topRpc = sortedData.find((el) => el.data.latency < 900)?.data ?? {};
 
-  return sortedData.map(({ data, ...rest }) => {
-    const { height = null, latency = null, url = '' } = data || {};
+  const res = sortedData
+    .map(({ data, ...rest }) => {
+      const { height = null, latency = null, url = '' } = data || {};
 
-    let trust = false;
-    let disableConnect = false;
+      let trust = false;
+      let disableConnect = false;
 
-    if (
-      !height ||
-      !latency ||
-      topRpc.height - height > 3 ||
-      latency - topRpc.latency > 5000
-    ) {
-      trust = false;
-    } else if (topRpc.height - height < 2 && topRpc.latency - latency > -100) {
-      trust = true;
-    } else {
-      trust = false;
-    }
+      if (topRpc.height - height < 1000 && topRpc.latency - latency > -100) {
+        trust = true;
+      } else {
+        trust = false;
+      }
 
-    if (url.includes('wss://') || url.includes('API_KEY'))
-      disableConnect = true;
+      if (url.includes('wss://') || url.includes('API_KEY'))
+        disableConnect = true;
 
-    const lat = latency ? (latency / 1000).toFixed(3) + 's' : null;
+      const lat = latency ? (latency / 1000).toFixed(3) + 's' : null;
 
-    return {
-      ...rest,
-      data: { ...data, height, latency: lat, trust, disableConnect },
-    };
-  });
+      return {
+        ...rest,
+        data: { ...data, height, latency: lat, trust, disableConnect },
+      };
+    })
+    .filter((el) => el.data.trust);
+
+  console.log(res);
+
+  return res;
 };
 
 @Injectable()
 export class EtherService {
   network: { rpc: string[]; chainId: number } | null;
 
-  @Cron(CronExpression.EVERY_10_MINUTES)
+  @Cron(CronExpression.EVERY_5_SECONDS)
   async getChainDataCronJob() {
     await this.refreshRpc();
   }
@@ -143,15 +146,20 @@ export class EtherService {
     const callRes = (
       await Promise.all(
         res.rpc
-          .filter(
-            (rpc) => !rpc.includes('wss://') && !blacklistRpc.includes(rpc),
-          )
+          .map((el) => {
+            return el.url;
+          })
+          .filter((el) => !!el)
+          .filter((url) => {
+            return !url.includes('wss://') && !blacklistRpc.includes(url);
+          })
           .map(async (el) => {
             return await fetchChain(el);
           }),
       )
     ).filter((el) => !!el);
-    const trustedRpc = assessChain(callRes)
+    const testedChain = await assessChain(callRes);
+    const trustedRpc = testedChain
       .filter((el) => el.data.trust)
       .map((el) => el.data.url);
     this.network = { ...res, rpc: trustedRpc };
