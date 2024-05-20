@@ -133,12 +133,15 @@ const assessChain = (chain: any) => {
 
 @Injectable()
 export class EtherService {
-  network: { rpc: string[]; chainId: number } | null;
+  network: { rpc: string[]; chainId: number } | null = {
+    rpc: ['https://eth.llamarpc.com'],
+    chainId: 1,
+  };
 
-  @Cron(CronExpression.EVERY_5_SECONDS)
-  async getChainDataCronJob() {
-    await this.refreshRpc();
-  }
+  // @Cron(CronExpression.EVERY_5_SECONDS)
+  // async getChainDataCronJob() {
+  //   await this.refreshRpc();
+  // }
 
   async refreshRpc() {
     console.log('Start refreshing chain data...');
